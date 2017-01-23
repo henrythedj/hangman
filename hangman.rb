@@ -39,6 +39,7 @@ class Hangman
 		#display available games
 		if File.exists?("saved_games")
 			puts "\nWhat's was your name again, kid? Here's all the folks I got in boots at the moment:"
+			puts "(type your name exactly as it appears below)"
 			puts Dir.entries("saved_games").select {|f| !File.directory? f}
 			puts ""
 			@player_name = gets.chomp
@@ -53,11 +54,43 @@ class Hangman
 	end
 
 	def save_game
+	#checks for saved game directory, creates if unavailable, checks for existing games under same name, saves if no conflicts
 		directory_name = "saved_games"
 		Dir.mkdir(directory_name) unless File.exists?(directory_name)
+		check_for_saved_games = []
+		check_for_saved_games = Dir.entries("saved_games").select {|f| !File.directory? f}
+		if check_for_saved_games.include?(@player_name)
+			self.overwrite_file
+		end
 		@save_array = [@player_name, @won, @wins, @losses, @guess_count, @number_of_wins, @difficulty, @turns, @word, @answer, @previous_guesses]
 		File.open("saved_games/#{@player_name}", "w") {|f| f.write(YAML.dump(@save_array))}
 		exit
+	end
+
+	def overwrite_file
+	#gives option to overwrite existing file or to rename your player
+		puts "\nHold up- there's another #{@player_name} already in a boot - do you want to overwrite their save file? (y/n)"
+		overwrite = gets.chomp.downcase
+		if self.verify_yn(overwrite) && overwrite == "y"
+			return
+		elsif self.verify_yn(overwrite) && overwrite == "n"
+			puts "\nWould you like to save under a different name? (y/n)"
+			new_name = gets.chomp.downcase
+			if self.verify_yn(new_name) && new_name == "y"
+				self.rename_player
+			elsif self.verify_yn(overwrite) && new_name == "n"
+				puts "\nYou are a difficult piece of cowpie. Ain't nothing I can do for you but run you through this gambit again."
+				self.save_game
+			end
+		else
+			self.overwrite_file
+		end
+	end
+
+	def rename_player
+		puts "\nAlright then - what's the new name gonna be? I'll save the game and head to the bar after you tell me."
+		@player_name = gets.chomp
+		self.save_game
 	end
 
 	def load_word 
@@ -143,26 +176,19 @@ class Hangman
 
 	def take_turn
 	#gets a letter from the user, verifies that it is a letter and hasn't been guessed, checks to see if it is valid, then returns status of game
-		puts "\nBefore you start - would you like to put this in a boot that we can pick up later? I got whiskey getting warm at the bar. (y/n)"
-		save_game = gets.chomp.downcase
-		if self.verify_yn(save_game)
-			if save_game == "n"
-				puts @prompts.sample
-				guess = gets.chomp.downcase
-				self.verify_guess(guess)
-				self.check_guess(guess)
-				self.game_status
-			else
-				self.save_game
-			end
-		else
-			self.take_turn
-		end
+		puts "\nRemember - you can type 'save' as your guess to put this in a boot that we can pick up later. I got whiskey getting warm at the bar, ain't in no rush."
+		puts @prompts.sample
+		guess = gets.chomp.downcase
+		self.verify_guess(guess)
+		self.check_guess(guess)
+		self.game_status
 	end
 
 	def check_guess(guess)
 	#checks if the guess is in the answer
-		if !@word.include?(guess)
+		if guess == "save"
+			self.save_game
+		elsif !@word.include?(guess)
 			puts @bad_guesses.sample
 			@guess_count -= 1
 		else
@@ -179,7 +205,7 @@ class Hangman
 	end
 
 	def verify_yn(response)
-	#verifies that a y/n response is a y or n
+	#verifies that a y/n response is a y or n. returns false if not
 		if response == "y" || response == "n"
 			return response
 		else
@@ -199,8 +225,11 @@ class Hangman
 	end
 
 	def verify_guess(response)
-	#checks if the guess is between a and z and hasn't been guessed already
-		if ('a'..'z') === response && !@previous_guesses.include?(response)
+	#checks if the guess is between a and z and hasn't been guessed already. also provides a path for saving
+		if response == "save"
+			puts "\nI'm putting you in my dirtiest boot. Come back when you've learned the whole alphabet, cowpoke."
+			return response
+		elsif ('a'..'z') === response && !@previous_guesses.include?(response)
 			(@turns += 1) ; (@previous_guesses << response) ; return response
 		elsif !('a'..'z').include?(response)
 			puts "Bad guess, stranger. Maybe you don't understand your situation. Give me an english letter between a and z or I'll hang you up right now."
